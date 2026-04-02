@@ -20,10 +20,13 @@ class Fighter {
     this.poseSpeed = 8;      /* blend speed */
 
     /* ── Idle layers ── */
-    this.bob   = 0;          /* breathing cycle */
-    this.sway  = 0;          /* weight shift */
-    this.idle2 = 0;          /* secondary idle timer */
-    this.idle3 = 0;          /* extra snap for more agile silhouettes */
+    this.bob   = side === 'hero' ? .35 : 1.9;  /* breathing cycle */
+    this.sway  = side === 'hero' ? .8 : 2.6;   /* weight shift */
+    this.idle2 = side === 'hero' ? 1.4 : 4.1;  /* secondary idle timer */
+    this.idle3 = side === 'hero' ? .2 : 2.9;   /* extra snap for more agile silhouettes */
+    this.stanceBias = side === 'hero'
+      ? { armLift: .18, lean: -.018, head: -.028, sway: .9, snap: 1.1, torso: 1 }
+      : { armLift: -.12, lean: .035, head: .05, sway: 1.18, snap: .85, torso: 1.18 };
 
     /* ── Eye blink ── */
     this.blinkTimer = rf(2, 5);
@@ -63,13 +66,17 @@ class Fighter {
     switch (pose) {
       case 'idle':
         return this.side === 'hero'
-          ? { la: -.48, ra: .2, ll: .08, rl: -.1, h: -.025, hd: -.03 }
-          : { la: -.2, ra: .5, ll: -.08, rl: .12, h: .025, hd: .035 };
+          ? { la: -.98, ra: -.08, ll: .12, rl: -.08, h: -.055, hd: -.05 }
+          : { la: .08, ra: .82, ll: -.14, rl: .2, h: .065, hd: .06 };
       case 'attack':   return { la: -1.7, ra: .9, ll: .2, rl: -.18, h: .1, hd: -.06 };
       case 'hit':      return { la: .6, ra: 1.2, ll: -.2, rl: .35, h: -.18, hd: .18 };
-      case 's_charge': return { la: -1.1, ra: 1.1, ll: .12, rl: -.12, h: 0, hd: 0 };
+      case 's_charge': return this.side === 'hero'
+        ? { la: -1.32, ra: .82, ll: .14, rl: -.12, h: -.03, hd: -.04 }
+        : { la: -.55, ra: 1.35, ll: -.08, rl: .16, h: .05, hd: .02 };
       case 's_fire':   return { la: -1.9, ra: -1.9, ll: .22, rl: -.22, h: .15, hd: 0 };
-      case 'domain':   return { la: -1.4, ra: 1.4, ll: .05, rl: -.05, h: 0, hd: -.1 };
+      case 'domain':   return this.side === 'hero'
+        ? { la: -1.75, ra: .98, ll: .08, rl: -.06, h: -.04, hd: -.12 }
+        : { la: -.7, ra: 1.75, ll: -.02, rl: .06, h: .08, hd: .03 };
       case 'victory':  return { la: -2.6, ra: -.8, ll: .06, rl: -.06, h: 0, hd: -.1 };
       case 'defeat':   return { la: .8, ra: 1.1, ll: .3, rl: -.45, h: -.35, hd: .3 };
       default:         return { la: 0, ra: 0, ll: 0, rl: 0, h: 0, hd: 0 };
@@ -88,17 +95,18 @@ class Fighter {
 
     /* idle breathing layers (only when idle-ish) */
     if (this.pose === 'idle' || this.pose === 's_charge') {
+      const bias = this.stanceBias;
       const breathAmp = this.pose === 's_charge' ? .09 : .045;
       const b = Math.sin(this.bob) * breathAmp;
-      const sw = Math.sin(this.sway) * .03;
+      const sw = Math.sin(this.sway) * .03 * bias.sway;
       const i2 = Math.sin(this.idle2) * .02;
-      const snap = Math.sin(this.idle3) * .015;
-      a.la += b + sw + snap;
-      a.ra += b - sw - snap * .4;
-      a.ll += i2 + sw * .22;
-      a.rl -= i2 - sw * .22;
-      a.h  += Math.sin(this.bob * .8) * .018 + Math.sin(this.idle2 * 1.2) * .008;
-      a.hd += Math.sin(this.sway * .75) * .012 + snap * .2;
+      const snap = Math.sin(this.idle3) * .015 * bias.snap;
+      a.la += b + sw + snap + bias.armLift;
+      a.ra += b - sw - snap * .45 - bias.armLift * .28;
+      a.ll += i2 + sw * .22 + bias.lean * .7;
+      a.rl -= i2 - sw * .22 - bias.lean * .5;
+      a.h  += Math.sin(this.bob * .8) * .018 * bias.torso + Math.sin(this.idle2 * 1.2) * .008 + bias.lean;
+      a.hd += Math.sin(this.sway * .75) * .012 + snap * .2 + bias.head;
     }
     return a;
   }

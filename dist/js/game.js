@@ -46,6 +46,19 @@ async function dashTo(fighter, targetX, dur, focusPower) {
   });
 }
 
+async function animateBeam(target, dur) {
+  const start = bmPr;
+  const t0 = performance.now();
+  return new Promise(resolve => {
+    (function tick() {
+      const pr = clamp((performance.now() - t0) / (dur || 220), 0, 1);
+      bmPr = lerp(start, target, ease.outCubic(pr));
+      if (pr < 1) requestAnimationFrame(tick);
+      else resolve();
+    })();
+  });
+}
+
 /* ── Balance ── */
 const DMG_MIN = 5, DMG_MAX = 11;
 const CRIT_MULT = 2.8, CRIT_CHANCE = .16;
@@ -207,38 +220,49 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
       sMin: 30, sMax: 100, szMin: 2, szMax: 6, lMin: .4, lMax: .9
     });
     emitRunes(atk.dx, gY() - 40 * atk.sc, 5, atkHero ? '#818cf8' : '#f97316');
+    emit(def.dx, gY() - 42 * def.sc, 4, {
+      col: atkHero ? '#d8b4fe' : '#fbbf24', ang: Math.PI / 2, sp: .9,
+      sMin: 14, sMax: 44, szMin: 1.5, szMax: 4.5, lMin: .2, lMax: .45
+    });
+    addSL(atkHero ? '#8b5cf640' : '#f9731640', 7);
     atk.addAfter();
     await sleep(120);
   }
 
   atk.setPose('s_fire', 16);
-  await dashTo(atk, lerp(atk.x, def.x, .38), 120, .18);
   bmOn = true; bmPr = 0; bmSd = atkHero ? 'left' : 'right';
   bmCol = atkHero ? '#7c3aed' : '#ef4444';
   bmCol2 = atkHero ? '#c084fc' : '#f97316';
   if (atkHero) showHud('SINGULARITY COLLAPSE', '#d8b4fe', 34, .9, H * .32);
 
-  const bStart = performance.now();
-  await new Promise(r => {
-    (function t() { bmPr = clamp((performance.now() - bStart) / 360, 0, 1);
-      if (bmPr < 1) requestAnimationFrame(t); else r();
-    })();
-  });
+  await Promise.all([
+    dashTo(atk, lerp(atk.x, def.x, .38), 120, .18),
+    animateBeam(.58, 180)
+  ]);
+  await animateBeam(1, 220);
 
   flash(.1, .8); shake('heavy', def.facing, 0); addSL(atkHero ? '#c084fc80' : '#f9731680', 16);
   hitstop(.14); chromaHit(atkHero ? 1 : .85);
-  def.hp -= dmg; def.setPose('hit', 10); def.fl = 1;
+  const hits = [Math.ceil(dmg * .42), Math.ceil(dmg * .33)];
+  hits.push(Math.max(1, dmg - hits[0] - hits[1]));
   def.sp = Math.min(100, def.sp + SP_GAIN_RECV);
 
   const impX = def.dx, impY = gY() - 45 * def.sc;
   focusCameraOn(impX, impY, .28);
-  emit(impX, impY, 42, { col: atkHero ? '#c084fc' : '#f87171', sMin: 80, sMax: 400, szMin: 3, szMax: 10, lMin: .3, lMax: .8 });
-  emit(impX, impY, 12, { col: atkHero ? '#e9d5ff' : '#fbbf24', tp: 'ring', szMin: 8, szMax: 18, lMin: .5, lMax: 1 });
-  impactSmear(impX, impY, def.facing, atkHero ? '#c084fc' : '#f97316');
-  impactSmear(impX, impY + 8, def.facing, '#fff');
-  emitRunes(impX, impY - 20, 7, atkHero ? '#d8b4fe' : '#f97316');
-  dustBurst(def.dx, gY(), 12, atkHero ? 'rgba(180,120,255,.45)' : 'rgba(140,100,220,.4)');
-  floatDmg(def.dx, gY() - 100 * def.sc, `-${dmg}`, atkHero ? '#d8b4fe' : '#f97316', 32);
+  for (let i = 0; i < hits.length; i++) {
+    const subDmg = hits[i];
+    def.hp -= subDmg; def.setPose('hit', 10); def.fl = 1;
+    emit(impX + rf(-14, 14), impY + rf(-8, 8), 18 - i * 2, {
+      col: atkHero ? '#c084fc' : '#f87171', sMin: 80, sMax: 400, szMin: 3, szMax: 10, lMin: .2, lMax: .6
+    });
+    emit(impX, impY, 5, { col: atkHero ? '#e9d5ff' : '#fbbf24', tp: 'ring', szMin: 8 + i * 3, szMax: 18 + i * 4, lMin: .25, lMax: .55 });
+    impactSmear(impX, impY + i * 6, def.facing, atkHero ? '#c084fc' : '#f97316');
+    impactSmear(impX, impY + 8, def.facing, '#fff');
+    emitRunes(impX, impY - 20, 3, atkHero ? '#d8b4fe' : '#f97316');
+    dustBurst(def.dx, gY(), 5, atkHero ? 'rgba(180,120,255,.45)' : 'rgba(140,100,220,.4)');
+    floatDmg(def.dx + rf(-12, 12), gY() - (100 + i * 12) * def.sc, `-${subDmg}`, atkHero ? '#d8b4fe' : '#f97316', i === hits.length - 1 ? 32 : 24);
+    if (i < hits.length - 1) await sleep(75);
+  }
 
   await sleep(320);
   bmOn = false; bmPr = 0; slo = 1;
@@ -254,54 +278,65 @@ async function domainCutscene(atk, def, atkHero, dmg, name) {
   atk.setPose('domain', 8); atk.auraMx = 1;
   setDark(true);
   focusCameraOn(atk.dx, gY() - 90 * atk.sc, .2);
-  await sleep(420);
+  await sleep(260);
 
   showHud('DOMAIN EXPANSION', '#fbbf24', 38, 1.5, H * .32);
+  showHud(atkHero ? 'REALITY BENDS' : 'REALITY RUPTURES', atkHero ? '#c4b5fd' : '#f87171', 24, .9, H * .39);
   addSL('#fbbf2480', 28); flash(.06, .6); shake('medium');
-  await sleep(520);
+  await sleep(360);
 
   showHud(name, atkHero ? '#818cf8' : '#ef4444', 58, 2, H * .44);
   flash(.08, .9); shake('heavy');
 
   domainActive = true; domainSide = atkHero ? 'hero' : 'villain';
-  const fStart = performance.now();
-  await new Promise(r => {
-    (function t() { domainAlpha = clamp((performance.now() - fStart) / 520, 0, 1);
-      if (domainAlpha < 1) requestAnimationFrame(t); else r();
-    })();
-  });
+  await Promise.all([
+    new Promise(r => {
+      const fStart = performance.now();
+      (function t() { domainAlpha = clamp((performance.now() - fStart) / 520, 0, 1);
+        if (domainAlpha < 1) requestAnimationFrame(t); else r();
+      })();
+    }),
+    (async () => {
+      for (let i = 0; i < 4; i++) {
+        emit(atk.dx, gY() - 50 * atk.sc, 18, {
+          col: atkHero ? '#818cf8' : '#ef4444', sMin: 80, sMax: 420, szMin: 3, szMax: 10, lMin: .25, lMax: .6
+        });
+        emit(atk.dx, gY() - 50 * atk.sc, 4, { col: '#fff', tp: 'ring', szMin: 10 + i * 4, szMax: 25 + i * 5, lMin: .25, lMax: .5 });
+        emitRunes(atk.dx, gY() - 60 * atk.sc, 5, atkHero ? '#818cf8' : '#ef4444');
+        addSL(atkHero ? '#818cf850' : '#ef444450', 10);
+        atk.addAfter();
+        await sleep(110);
+      }
+    })()
+  ]);
 
-  emit(atk.dx, gY() - 50 * atk.sc, 52, {
-    col: atkHero ? '#818cf8' : '#ef4444', sMin: 80, sMax: 420, szMin: 3, szMax: 10, lMin: .4, lMax: 1
-  });
-  emit(atk.dx, gY() - 50 * atk.sc, 14, { col: '#fff', tp: 'ring', szMin: 10, szMax: 25, lMin: .5, lMax: 1.2 });
-  emitRunes(atk.dx, gY() - 60 * atk.sc, 18, atkHero ? '#818cf8' : '#ef4444');
-  await sleep(360);
+  await sleep(180);
 
   atk.setPose('s_fire', 16);
-  await dashTo(atk, lerp(atk.x, def.x, .34), 130, .2);
   bmOn = true; bmPr = 0; bmSd = atkHero ? 'left' : 'right';
   bmCol = atkHero ? '#6366f1' : '#dc2626'; bmCol2 = atkHero ? '#c4b5fd' : '#fbbf24';
-  const bStart = performance.now();
-  await new Promise(r => {
-    (function t() { bmPr = clamp((performance.now() - bStart) / 420, 0, 1);
-      if (bmPr < 1) requestAnimationFrame(t); else r();
-    })();
-  });
+  await Promise.all([
+    dashTo(atk, lerp(atk.x, def.x, .34), 130, .2),
+    animateBeam(.72, 260)
+  ]);
+  await animateBeam(1, 260);
 
-  const hits = rand(4, 6);
+  const hits = rand(6, 9);
   for (let i = 0; i < hits; i++) {
-    const subDmg = Math.round(dmg / hits);
+    const subDmg = i === hits - 1 ? Math.max(1, dmg - Math.round(dmg / hits) * (hits - 1)) : Math.round(dmg / hits);
     def.hp -= subDmg; def.fl = 1; def.setPose('hit', 14);
     hitstop(.07); shake('heavy', def.facing, 0); flash(.04, .7); chromaHit(.6);
     const ix = def.dx + rf(-30, 30), iy = gY() - rf(30, 70) * def.sc;
     focusCameraOn(ix, iy, .28);
     emit(ix, iy, 22, { col: atkHero ? '#c4b5fd' : '#fbbf24', sMin: 60, sMax: 320, szMin: 3, szMax: 9, lMin: .2, lMax: .6 });
     emit(ix, iy, 5, { col: '#fff', tp: 'hex', szMin: 8, szMax: 18, lMin: .3, lMax: .7 });
+    emit(ix, iy, 8, { col: atkHero ? '#e9d5ff' : '#fde68a', tp: 'spark', szMin: 8, szMax: 22, sMin: 140, sMax: 420, lMin: .12, lMax: .24 });
     impactSmear(ix, iy, def.facing, atkHero ? '#c4b5fd' : '#fbbf24');
     dustBurst(def.dx, gY(), 4, 'rgba(251,191,36,.28)');
+    addSL(atkHero ? '#c4b5fd40' : '#fbbf2440', 6);
+    atk.addAfter();
     floatDmg(ix, iy - 20, `-${subDmg}`, '#fbbf24', 26);
-    await sleep(140);
+    await sleep(95);
   }
 
   bmOn = false; setDark(false);

@@ -274,32 +274,64 @@ function drawBG() {
 }
 
 function drawDomainOverlay() {
-  cx.save(); cx.globalAlpha = domainAlpha * .55;
-  domainPat += dt * 2;
+  cx.save(); cx.globalAlpha = domainAlpha * .62;
+  domainPat += dt * 2.8;
   cx.translate(W / 2, H / 2);
-  for (let r = 0; r < 6; r++) {
-    const rad = 40 + r * 70 + Math.sin(domainPat + r) * 18, sides = 6 + r;
+  for (let r = 0; r < 8; r++) {
+    const rad = 40 + r * 56 + Math.sin(domainPat * 1.3 + r) * 22, sides = 6 + r;
     cx.beginPath();
     for (let i = 0; i < sides; i++) {
-      const an = (Math.PI * 2 / sides) * i + domainPat * .25 + r * .15;
+      const an = (Math.PI * 2 / sides) * i + domainPat * (.25 + r * .018) + r * .15;
       cx[i === 0 ? 'moveTo' : 'lineTo'](Math.cos(an) * rad, Math.sin(an) * rad);
     }
     cx.closePath();
-    cx.strokeStyle = (domainSide === 'hero' ? 'rgba(99,102,241,' : 'rgba(239,68,68,') + (.1 - r * .013) + ')';
-    cx.lineWidth = 1.5; cx.stroke();
+    cx.strokeStyle = (domainSide === 'hero' ? 'rgba(99,102,241,' : 'rgba(239,68,68,') + (.12 - r * .011) + ')';
+    cx.lineWidth = Math.max(.8, 1.8 - r * .1); cx.stroke();
   }
-  for (let i = 0; i < 14; i++) {
-    const an = (Math.PI * 2 / 14) * i + domainPat * .4;
-    cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(Math.cos(an) * 340, Math.sin(an) * 340);
-    cx.strokeStyle = (domainSide === 'hero' ? 'rgba(99,102,241,' : 'rgba(239,68,68,') + '.03)';
+  for (let i = 0; i < 20; i++) {
+    const an = (Math.PI * 2 / 20) * i + domainPat * .42;
+    cx.beginPath();
+    cx.moveTo(Math.cos(an) * 26, Math.sin(an) * 26);
+    cx.lineTo(Math.cos(an) * 370, Math.sin(an) * 370);
+    cx.strokeStyle = (domainSide === 'hero' ? 'rgba(99,102,241,' : 'rgba(239,68,68,') + '.04)';
     cx.lineWidth = 1; cx.stroke();
   }
+  for (let i = 0; i < 11; i++) {
+    const arcR = 86 + i * 34 + Math.sin(domainPat * 1.8 + i) * 14;
+    const start = domainPat * (.4 + i * .02) + i * .35;
+    cx.beginPath();
+    cx.arc(0, 0, arcR, start, start + Math.PI * (.32 + (i % 3) * .08));
+    cx.strokeStyle = domainSide === 'hero' ? `rgba(196,181,253,${.08 - i * .005})` : `rgba(251,191,36,${.08 - i * .005})`;
+    cx.lineWidth = 2.2 - i * .12;
+    cx.stroke();
+  }
   cx.restore();
-  cx.save(); cx.globalAlpha = domainAlpha * .3;
+  cx.save(); cx.globalAlpha = domainAlpha * .34;
   const vg = cx.createRadialGradient(W / 2, H / 2, W * .08, W / 2, H / 2, W * .7);
-  vg.addColorStop(0, 'transparent');
+  vg.addColorStop(0, 'rgba(255,255,255,.02)');
+  vg.addColorStop(.38, 'transparent');
   vg.addColorStop(1, domainSide === 'hero' ? '#08042a' : '#1a0505');
   cx.fillStyle = vg; cx.fillRect(0, 0, W, H);
+  cx.restore();
+
+  cx.save();
+  cx.globalCompositeOperation = 'lighter';
+  cx.globalAlpha = domainAlpha * .16;
+  const rift = cx.createLinearGradient(0, H * .18, 0, H * .82);
+  if (domainSide === 'hero') {
+    rift.addColorStop(0, 'transparent');
+    rift.addColorStop(.5, 'rgba(196,181,253,.85)');
+    rift.addColorStop(1, 'transparent');
+  } else {
+    rift.addColorStop(0, 'transparent');
+    rift.addColorStop(.5, 'rgba(251,191,36,.85)');
+    rift.addColorStop(1, 'transparent');
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = W * (.14 + i * .18) + Math.sin(domainPat * 1.5 + i * 1.3) * 26;
+    cx.fillStyle = rift;
+    cx.fillRect(x, H * .14, 2 + (i % 2), H * .72);
+  }
   cx.restore();
 }
 
@@ -374,30 +406,43 @@ function drawBeam(c) {
   const dist = W * .7 * bmPr;
   const tx = fx + src.facing * dist;
   const orbR = 16 + bmPr * 34;
-  const trailLen = 32 + bmPr * 140;
+  const trailLen = 32 + bmPr * 190;
 
   c.save();
   c.translate(tx, by);
 
-  for (let i = 0; i < 4; i++) {
-    const ringR = orbR * (1.15 + i * .22 + Math.sin(gt * 7 + i) * .05);
+  for (let i = 0; i < 6; i++) {
+    const ringR = orbR * (1.08 + i * .19 + Math.sin(gt * 7 + i * .8) * .08);
     c.save();
     c.rotate(gt * (.8 + i * .22) * (bmSd === 'left' ? 1 : -1));
-    c.globalAlpha = .08 - i * .014;
+    c.globalAlpha = .1 - i * .012;
     c.strokeStyle = i % 2 === 0 ? bmCol : bmCol2;
-    c.lineWidth = 2.2;
+    c.lineWidth = 2.4 - i * .18;
     c.beginPath();
     c.ellipse(0, 0, ringR, ringR * (.62 + i * .04), i * .55, 0, Math.PI * 2);
     c.stroke();
     c.restore();
   }
 
+  for (let i = 0; i < 4; i++) {
+    const satR = orbR * (1.35 + i * .12);
+    const an = gt * (2.4 + i * .45) * (bmSd === 'left' ? 1 : -1) + i * Math.PI * .5;
+    c.save();
+    c.translate(Math.cos(an) * satR, Math.sin(an * 1.3) * satR * .42);
+    c.globalAlpha = .32 - i * .05;
+    c.fillStyle = i % 2 === 0 ? bmCol2 : '#ffffff';
+    c.shadowBlur = 16;
+    c.shadowColor = bmCol2;
+    c.beginPath(); c.arc(0, 0, Math.max(2.2, 5 - i * .8), 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+
   const trail = c.createLinearGradient(-src.facing * trailLen, 0, 0, 0);
   trail.addColorStop(0, 'transparent');
-  trail.addColorStop(.45, bmCol);
-  trail.addColorStop(.8, bmCol2);
+  trail.addColorStop(.2, bmCol);
+  trail.addColorStop(.7, bmCol2);
   trail.addColorStop(1, 'rgba(255,255,255,.95)');
-  c.globalAlpha = .38;
+  c.globalAlpha = .44;
   c.fillStyle = trail;
   c.beginPath();
   c.moveTo(-src.facing * trailLen, -orbR * .32);
@@ -405,6 +450,18 @@ function drawBeam(c) {
   c.quadraticCurveTo(-src.facing * trailLen * .38, orbR * 1.1, -src.facing * trailLen, orbR * .32);
   c.closePath();
   c.fill();
+
+  c.globalAlpha = .18;
+  c.strokeStyle = '#ffffff';
+  c.lineWidth = orbR * .18;
+  c.beginPath();
+  c.moveTo(-src.facing * trailLen * .92, 0);
+  for (let i = 0; i <= 6; i++) {
+    const px = -src.facing * trailLen * (.92 - i * .14);
+    const py = Math.sin(gt * 18 + i * 1.4) * orbR * .18;
+    c.lineTo(px, py);
+  }
+  c.stroke();
 
   const shell = c.createRadialGradient(0, 0, 0, 0, 0, orbR * 1.6);
   shell.addColorStop(0, '#ffffff');
