@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: epic-final-battle
+    runtime: static
+    staticPublishPath: ./dist
+    buildCommand: echo "Static site — no build needed"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

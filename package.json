@@ -1,0 +1,10 @@
+{
+  "name": "epic-final-battle",
+  "version": "1.0.0",
+  "description": "Cinematic anime-style coin-flip battle simulator",
+  "private": true,
+  "scripts": {
+    "start": "npx serve dist -l 3000",
+    "dev": "npx serve dist -l 3000"
+  }
+}
