@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Open EPIC FINAL BATTLE",
+      "type": "chrome",
+      "request": "launch",
+      "file": "${workspaceFolder}/dist/index.html"
+    }
+  ]
+}
