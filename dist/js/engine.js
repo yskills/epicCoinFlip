@@ -58,11 +58,18 @@ function shake(lv, dirX, dirY) {
 let fa = 0;
 let da = 0, dT = 0;
 let zm = 1, zT = 1, zmX = .5, zmY = .5;
+let camX = 0, camY = 0, camTX = 0, camTY = 0;
 let domainActive = false, domainAlpha = 0, domainSide = 'hero', domainPat = 0;
 
 function flash(dur, int) { fa = int || .7; setTimeout(() => fa = 0, (dur || .1) * 1000); }
 function setDark(on) { dT = on ? 1 : 0; }
 function zoomAt(z, x, y) { zT = z; zmX = (x || W / 2) / W; zmY = (y || H / 2) / H; }
+function focusCameraOn(x, y, power) {
+  const px = clamp((W * .5 - x) * (power || .12), -W * .12, W * .12);
+  const py = clamp((H * .42 - y) * (power || .08), -H * .08, H * .08);
+  camTX = px; camTY = py;
+}
+function releaseCamera() { camTX = 0; camTY = 0; }
 
 /* ── Chromatic aberration ── */
 let caStr = 0;
@@ -194,11 +201,29 @@ function floatDmg(x, y, txt, col, sz) {
 const bgStars = Array.from({ length: 90 }, () => ({
   x: Math.random(), y: Math.random(), r: rf(.3, 1.4), s: rf(.5, 2)
 }));
+const voidBands = Array.from({ length: 7 }, (_, i) => ({
+  y: Math.random(), h: rf(.05, .12), drift: rf(.015, .05), alpha: .02 + i * .01
+}));
+const voidStreaks = Array.from({ length: 42 }, () => ({
+  x: rf(-1, 1), y: rf(-1, 1), z: rf(.12, 1), w: rf(1, 3.5), hue: rand(220, 285)
+}));
 
 function drawBG() {
-  const bg = cx.createRadialGradient(W / 2, H * .38, 0, W / 2, H * .38, Math.max(W, H) * .7);
-  bg.addColorStop(0, '#0a0520'); bg.addColorStop(.5, '#050510'); bg.addColorStop(1, '#020208');
+  const driftX = Math.sin(gt * .12) * W * .03;
+  const driftY = Math.cos(gt * .08) * H * .025;
+  const bg = cx.createRadialGradient(W / 2 + driftX, H * .38 + driftY, 0, W / 2, H * .42, Math.max(W, H) * .76);
+  bg.addColorStop(0, '#120a2d'); bg.addColorStop(.4, '#070714'); bg.addColorStop(1, '#010105');
   cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
+
+  for (const band of voidBands) {
+    const y = ((band.y + gt * band.drift) % 1) * H;
+    const grad = cx.createLinearGradient(0, y - H * band.h, 0, y + H * band.h);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(.5, `rgba(70,40,140,${band.alpha})`);
+    grad.addColorStop(1, 'transparent');
+    cx.fillStyle = grad;
+    cx.fillRect(0, y - H * band.h, W, H * band.h * 2);
+  }
 
   for (let i = 0; i < 4; i++) {
     const ph = gt * .5 + i * 1.8, pr = (ph % 5) / 5, r = pr * Math.max(W, H) * .5;
@@ -209,9 +234,34 @@ function drawBG() {
 
   for (const s of bgStars) {
     const a = .12 + Math.sin(gt * s.s + s.x * 10) * .12;
-    cx.beginPath(); cx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    cx.beginPath(); cx.arc((s.x * W + driftX * .25 + W) % W, (s.y * H + driftY * .2 + H) % H, s.r, 0, Math.PI * 2);
     cx.fillStyle = `rgba(160,140,200,${a})`; cx.fill();
   }
+
+  cx.save();
+  cx.translate(W / 2, H / 2);
+  for (const star of voidStreaks) {
+    star.z -= dt * (star.z * 1.6 + .18);
+    if (star.z <= .03) {
+      star.x = rf(-1.1, 1.1);
+      star.y = rf(-.8, .8);
+      star.z = 1;
+      star.w = rf(1, 3.5);
+      star.hue = rand(220, 285);
+    }
+    const px = star.x / star.z * W * .45;
+    const py = star.y / star.z * H * .45;
+    const len = (1 - star.z) * 34;
+    const ang = Math.atan2(py, px);
+    cx.save();
+    cx.translate(px, py);
+    cx.rotate(ang);
+    cx.globalAlpha = clamp((1 - star.z) * .45, 0, .42);
+    cx.fillStyle = `hsla(${star.hue},85%,70%,.9)`;
+    cx.fillRect(-len * .15, -star.w * .5, len + 2, star.w);
+    cx.restore();
+  }
+  cx.restore();
 
   const gy = gY();
   const gg = cx.createLinearGradient(0, gy - 2, 0, gy + 80);

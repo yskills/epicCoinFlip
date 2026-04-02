@@ -5,6 +5,47 @@
 
 let hero, villain, gameState = 'menu';
 
+function fightScale() {
+  const base = Math.min(W / 760, H / 560);
+  return clamp(base * (W < 760 ? 1.34 : 1.16), 1.02, 1.78);
+}
+
+function fightSpread() {
+  return clamp(W * (W < 760 ? .22 : .18), 110, 230);
+}
+
+function layoutFighters() {
+  if (!hero || !villain) return;
+  const sc = fightScale();
+  const spread = fightSpread();
+  const heroX = W * .5 - spread;
+  const villainX = W * .5 + spread;
+  hero.sc = sc; villain.sc = sc;
+  hero.bx = heroX; villain.bx = villainX;
+  hero.x = heroX; villain.x = villainX;
+  if (Math.abs(hero.dx - heroX) > 140) hero.dx = heroX;
+  if (Math.abs(villain.dx - villainX) > 140) villain.dx = villainX;
+}
+
+async function dashTo(fighter, targetX, dur, focusPower) {
+  const startX = fighter.x;
+  const t0 = performance.now();
+  return new Promise(resolve => {
+    (function tick() {
+      const pr = clamp((performance.now() - t0) / (dur || 120), 0, 1);
+      fighter.x = lerp(startX, targetX, ease.inOutCubic(pr));
+      if (pr < 1) {
+        if (Math.random() < .75) fighter.addAfter();
+        focusCameraOn((fighter.dx + targetX) * .5, gY() - 75 * fighter.sc, focusPower || .16);
+        requestAnimationFrame(tick);
+      } else {
+        fighter.x = targetX;
+        resolve();
+      }
+    })();
+  });
+}
+
 /* ── Balance ── */
 const DMG_MIN = 5, DMG_MAX = 11;
 const CRIT_MULT = 2.8, CRIT_CHANCE = .16;
@@ -26,9 +67,10 @@ function startGame() {
   $('start').style.display = 'none';
   gameState = 'fight';
 
-  const sc = Math.min(W, 900) / 900 * 1.42;
-  hero    = new Fighter(n1, 'hero',    W * .3, sc);
-  villain = new Fighter(n2, 'villain', W * .7, sc);
+  const sc = fightScale();
+  const spread = fightSpread();
+  hero    = new Fighter(n1, 'hero',    W * .5 - spread, sc);
+  villain = new Fighter(n2, 'villain', W * .5 + spread, sc);
 
   lt = performance.now() / 1000;
   requestAnimationFrame(loop);
@@ -88,11 +130,12 @@ async function attackTurn() {
 /* ════════════ NORMAL / CRIT ════════════ */
 async function normalAttack(atk, def, atkHero, dmg, kind, name) {
   const origX = atk.x;
+  const dashX = lerp(atk.x, def.x, .52);
   atk.addAfter();
-  atk.x = lerp(atk.x, def.x, .52);
   atk.setPose('attack', 16);
   addSL(atkHero ? '#3b82f680' : '#ef444480', 10);
   dustBurst(atk.dx, gY(), 7, 'rgba(120,100,200,.3)');
+  await dashTo(atk, dashX, kind === 'crit' ? 140 : 100, kind === 'crit' ? .2 : .14);
 
   if (kind === 'crit') {
     slo = .16;
@@ -104,6 +147,7 @@ async function normalAttack(atk, def, atkHero, dmg, kind, name) {
     showHud(name, '#fbbf24', 54, 1.4);
     /* zoom punch-in toward impact */
     zoomAt(1.2, (atk.dx + def.dx) / 2, gY() - 40);
+    focusCameraOn((atk.dx + def.dx) / 2, gY() - 55, .24);
   }
 
   await sleep(kind === 'crit' ? 220 : 120);
@@ -123,6 +167,7 @@ async function normalAttack(atk, def, atkHero, dmg, kind, name) {
 
   const impX = def.dx - def.facing * 15;
   const impY = gY() - 45 * def.sc;
+  focusCameraOn(impX, impY, kind === 'crit' ? .26 : .16);
 
   emit(impX, impY, kind === 'crit' ? 30 : 14, {
     col: atkHero ? '#60a5fa' : '#f87171', sMin: 60, sMax: 300, szMin: 2, szMax: 6, lMin: .2, lMax: .55
@@ -143,7 +188,8 @@ async function normalAttack(atk, def, atkHero, dmg, kind, name) {
   await sleep(kind === 'crit' ? 250 : 140);
 
   atk.setPose('idle'); def.setPose('idle'); atk.auraMx = 0;
-  atk.x = origX;
+  await dashTo(atk, origX, 120, .08);
+  releaseCamera();
 }
 
 /* ════════════ SPECIAL ════════════ */
@@ -153,6 +199,7 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
   showHud(name, atkHero ? '#818cf8' : '#f97316', 48, 1.6);
   addSL(atkHero ? '#6366f180' : '#ef444480', 18);
   slo = .24;
+  focusCameraOn(atk.dx, gY() - 90 * atk.sc, .16);
 
   for (let i = 0; i < 3; i++) {
     emit(atk.dx, gY() - 50 * atk.sc, 12, {
@@ -165,6 +212,7 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
   }
 
   atk.setPose('s_fire', 16);
+  await dashTo(atk, lerp(atk.x, def.x, .38), 120, .18);
   bmOn = true; bmPr = 0; bmSd = atkHero ? 'left' : 'right';
   bmCol = atkHero ? '#3b82f6' : '#ef4444'; bmCol2 = atkHero ? '#8b5cf6' : '#f97316';
 
@@ -181,6 +229,7 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
   def.sp = Math.min(100, def.sp + SP_GAIN_RECV);
 
   const impX = def.dx, impY = gY() - 45 * def.sc;
+  focusCameraOn(impX, impY, .28);
   emit(impX, impY, 42, { col: atkHero ? '#60a5fa' : '#f87171', sMin: 80, sMax: 400, szMin: 3, szMax: 10, lMin: .3, lMax: .8 });
   emit(impX, impY, 12, { col: atkHero ? '#818cf8' : '#fbbf24', tp: 'ring', szMin: 8, szMax: 18, lMin: .5, lMax: 1 });
   impactSmear(impX, impY, def.facing, atkHero ? '#818cf8' : '#f97316');
@@ -191,7 +240,9 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
 
   await sleep(320);
   bmOn = false; bmPr = 0; slo = 1;
+  await dashTo(atk, atk.bx, 150, .08);
   atk.setPose('idle'); def.setPose('idle'); atk.auraMx = 0;
+  releaseCamera();
 }
 
 /* ════════════ DOMAIN EXPANSION ════════════ */
@@ -200,6 +251,7 @@ async function domainCutscene(atk, def, atkHero, dmg, name) {
   slo = .14;
   atk.setPose('domain', 8); atk.auraMx = 1;
   setDark(true);
+  focusCameraOn(atk.dx, gY() - 90 * atk.sc, .2);
   await sleep(420);
 
   showHud('DOMAIN EXPANSION', '#fbbf24', 38, 1.5, H * .32);
@@ -225,6 +277,7 @@ async function domainCutscene(atk, def, atkHero, dmg, name) {
   await sleep(360);
 
   atk.setPose('s_fire', 16);
+  await dashTo(atk, lerp(atk.x, def.x, .34), 130, .2);
   bmOn = true; bmPr = 0; bmSd = atkHero ? 'left' : 'right';
   bmCol = atkHero ? '#6366f1' : '#dc2626'; bmCol2 = atkHero ? '#c4b5fd' : '#fbbf24';
   const bStart = performance.now();
@@ -240,6 +293,7 @@ async function domainCutscene(atk, def, atkHero, dmg, name) {
     def.hp -= subDmg; def.fl = 1; def.setPose('hit', 14);
     hitstop(.07); shake('heavy', def.facing, 0); flash(.04, .7); chromaHit(.6);
     const ix = def.dx + rf(-30, 30), iy = gY() - rf(30, 70) * def.sc;
+    focusCameraOn(ix, iy, .28);
     emit(ix, iy, 22, { col: atkHero ? '#c4b5fd' : '#fbbf24', sMin: 60, sMax: 320, szMin: 3, szMax: 9, lMin: .2, lMax: .6 });
     emit(ix, iy, 5, { col: '#fff', tp: 'hex', szMin: 8, szMax: 18, lMin: .3, lMax: .7 });
     impactSmear(ix, iy, def.facing, atkHero ? '#c4b5fd' : '#fbbf24');
@@ -256,7 +310,9 @@ async function domainCutscene(atk, def, atkHero, dmg, name) {
     })();
   });
   domainAlpha = 0; domainActive = false; slo = 1;
+  await dashTo(atk, atk.bx, 170, .08);
   atk.setPose('idle'); def.setPose('idle'); atk.auraMx = 0;
+  releaseCamera();
 }
 
 /* ════════════ END ════════════ */
@@ -321,6 +377,8 @@ function loop(now) {
 
   da = lerp(da, dT, rawDt * 4);
   zm = lerp(zm, zT, rawDt * 5);
+  camX = lerp(camX, camTX, rawDt * 4.5);
+  camY = lerp(camY, camTY, rawDt * 4.5);
   caStr = Math.max(0, caStr - rawDt * 6);
 
   if (hero) hero.update(dt);
@@ -339,7 +397,7 @@ function loop(now) {
 
   /* ═══ DRAW ═══ */
   cx.save();
-  cx.translate(sk.x, sk.y);
+  cx.translate(sk.x + camX, sk.y + camY);
 
   /* zoom toward impact point */
   const zox = W * zmX, zoy = H * zmY;
@@ -399,3 +457,4 @@ document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => {
   if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
+addEventListener('resize', layoutFighters);
