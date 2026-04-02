@@ -56,7 +56,7 @@ const SP_GAIN_HIT = 18, SP_GAIN_RECV = 12;
 
 /* ── Ability names ── */
 const HERO_ATK  = ['STRIKE', 'PALM THRUST', 'FORCE BLOW'];
-const HERO_CRIT = 'DARK IMPACT', HERO_SP = 'VOID STRIKE', HERO_DOM = 'INFINITE DOMAIN';
+const HERO_CRIT = 'DARK IMPACT', HERO_SP = 'VOID SINGULARITY', HERO_DOM = 'INFINITE DOMAIN';
 const VILL_ATK  = ['SLASH', 'CLAW', 'REND'];
 const VILL_CRIT = 'DARK IMPACT', VILL_SP = 'CURSED CLEAVE', VILL_DOM = 'SHADOW DOMAIN';
 
@@ -214,7 +214,9 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
   atk.setPose('s_fire', 16);
   await dashTo(atk, lerp(atk.x, def.x, .38), 120, .18);
   bmOn = true; bmPr = 0; bmSd = atkHero ? 'left' : 'right';
-  bmCol = atkHero ? '#3b82f6' : '#ef4444'; bmCol2 = atkHero ? '#8b5cf6' : '#f97316';
+  bmCol = atkHero ? '#7c3aed' : '#ef4444';
+  bmCol2 = atkHero ? '#c084fc' : '#f97316';
+  if (atkHero) showHud('SINGULARITY COLLAPSE', '#d8b4fe', 34, .9, H * .32);
 
   const bStart = performance.now();
   await new Promise(r => {
@@ -223,20 +225,20 @@ async function specialAttack(atk, def, atkHero, dmg, name) {
     })();
   });
 
-  flash(.1, .8); shake('heavy', def.facing, 0); addSL(atkHero ? '#818cf880' : '#f9731680', 16);
-  hitstop(.12); chromaHit(.85);
+  flash(.1, .8); shake('heavy', def.facing, 0); addSL(atkHero ? '#c084fc80' : '#f9731680', 16);
+  hitstop(.14); chromaHit(atkHero ? 1 : .85);
   def.hp -= dmg; def.setPose('hit', 10); def.fl = 1;
   def.sp = Math.min(100, def.sp + SP_GAIN_RECV);
 
   const impX = def.dx, impY = gY() - 45 * def.sc;
   focusCameraOn(impX, impY, .28);
-  emit(impX, impY, 42, { col: atkHero ? '#60a5fa' : '#f87171', sMin: 80, sMax: 400, szMin: 3, szMax: 10, lMin: .3, lMax: .8 });
-  emit(impX, impY, 12, { col: atkHero ? '#818cf8' : '#fbbf24', tp: 'ring', szMin: 8, szMax: 18, lMin: .5, lMax: 1 });
-  impactSmear(impX, impY, def.facing, atkHero ? '#818cf8' : '#f97316');
+  emit(impX, impY, 42, { col: atkHero ? '#c084fc' : '#f87171', sMin: 80, sMax: 400, szMin: 3, szMax: 10, lMin: .3, lMax: .8 });
+  emit(impX, impY, 12, { col: atkHero ? '#e9d5ff' : '#fbbf24', tp: 'ring', szMin: 8, szMax: 18, lMin: .5, lMax: 1 });
+  impactSmear(impX, impY, def.facing, atkHero ? '#c084fc' : '#f97316');
   impactSmear(impX, impY + 8, def.facing, '#fff');
-  emitRunes(impX, impY - 20, 5, atkHero ? '#818cf8' : '#f97316');
-  dustBurst(def.dx, gY(), 12, 'rgba(140,100,220,.4)');
-  floatDmg(def.dx, gY() - 100 * def.sc, `-${dmg}`, atkHero ? '#818cf8' : '#f97316', 32);
+  emitRunes(impX, impY - 20, 7, atkHero ? '#d8b4fe' : '#f97316');
+  dustBurst(def.dx, gY(), 12, atkHero ? 'rgba(180,120,255,.45)' : 'rgba(140,100,220,.4)');
+  floatDmg(def.dx, gY() - 100 * def.sc, `-${dmg}`, atkHero ? '#d8b4fe' : '#f97316', 32);
 
   await sleep(320);
   bmOn = false; bmPr = 0; slo = 1;

@@ -361,31 +361,71 @@ function drawHud(c) {
 }
 
 /* ════════════════════════════
-   BEAM
+   SINGULARITY PROJECTILE
    ════════════════════════════ */
 let bmOn = false, bmPr = 0, bmSd = 'left', bmCol = '#3b82f6', bmCol2 = '#8b5cf6';
 
 function drawBeam(c) {
   if (!bmOn || typeof hero === 'undefined') return;
-  const by = gY() - 36, bh = 14 + bmPr * 28;
+  const by = gY() - 42;
   const src = bmSd === 'left' ? hero : villain;
   if (!src) return;
-  const fx = src.dx + src.facing * 38 * src.sc;
+  const fx = src.dx + src.facing * 44 * src.sc;
   const dist = W * .7 * bmPr;
   const tx = fx + src.facing * dist;
-  const lx = Math.min(fx, tx), rx = Math.max(fx, tx);
+  const orbR = 16 + bmPr * 34;
+  const trailLen = 32 + bmPr * 140;
+
   c.save();
-  c.globalAlpha = .2; c.shadowBlur = 100; c.shadowColor = bmCol;
-  c.fillStyle = bmCol; c.fillRect(lx, by - bh * 1.5, rx - lx, bh * 3);
+  c.translate(tx, by);
+
+  for (let i = 0; i < 4; i++) {
+    const ringR = orbR * (1.15 + i * .22 + Math.sin(gt * 7 + i) * .05);
+    c.save();
+    c.rotate(gt * (.8 + i * .22) * (bmSd === 'left' ? 1 : -1));
+    c.globalAlpha = .08 - i * .014;
+    c.strokeStyle = i % 2 === 0 ? bmCol : bmCol2;
+    c.lineWidth = 2.2;
+    c.beginPath();
+    c.ellipse(0, 0, ringR, ringR * (.62 + i * .04), i * .55, 0, Math.PI * 2);
+    c.stroke();
+    c.restore();
+  }
+
+  const trail = c.createLinearGradient(-src.facing * trailLen, 0, 0, 0);
+  trail.addColorStop(0, 'transparent');
+  trail.addColorStop(.45, bmCol);
+  trail.addColorStop(.8, bmCol2);
+  trail.addColorStop(1, 'rgba(255,255,255,.95)');
+  c.globalAlpha = .38;
+  c.fillStyle = trail;
+  c.beginPath();
+  c.moveTo(-src.facing * trailLen, -orbR * .32);
+  c.quadraticCurveTo(-src.facing * trailLen * .38, -orbR * 1.1, 0, -orbR * .2);
+  c.quadraticCurveTo(-src.facing * trailLen * .38, orbR * 1.1, -src.facing * trailLen, orbR * .32);
+  c.closePath();
+  c.fill();
+
+  const shell = c.createRadialGradient(0, 0, 0, 0, 0, orbR * 1.6);
+  shell.addColorStop(0, '#ffffff');
+  shell.addColorStop(.22, bmCol2);
+  shell.addColorStop(.55, bmCol);
+  shell.addColorStop(1, 'rgba(0,0,0,0)');
   c.globalAlpha = 1;
-  const g = c.createLinearGradient(lx, 0, rx, 0);
-  g.addColorStop(0, 'transparent'); g.addColorStop(.02, bmCol);
-  g.addColorStop(.35, bmCol2); g.addColorStop(.5, '#fff');
-  g.addColorStop(.65, bmCol2); g.addColorStop(.98, bmCol); g.addColorStop(1, 'transparent');
-  c.fillStyle = g; c.shadowBlur = 55; c.shadowColor = bmCol2;
-  c.fillRect(lx, by - bh / 2, rx - lx, bh);
-  c.fillStyle = 'rgba(255,255,255,.85)';
-  c.fillRect(lx, by - bh * .2, rx - lx, bh * .4);
+  c.shadowBlur = 45 + orbR * .8;
+  c.shadowColor = bmCol2;
+  c.fillStyle = shell;
+  c.beginPath(); c.arc(0, 0, orbR, 0, Math.PI * 2); c.fill();
+
+  c.globalCompositeOperation = 'lighter';
+  c.fillStyle = 'rgba(255,255,255,.9)';
+  c.beginPath(); c.arc(0, 0, orbR * .34, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.25)';
+  c.beginPath(); c.arc(-src.facing * orbR * .28, -orbR * .18, orbR * .22, 0, Math.PI * 2); c.fill();
   c.restore();
-  if (bmPr > .1) emit(tx, by, 2, { col: bmCol, sMin: 18, sMax: 80, szMin: 2, szMax: 5, lMin: .1, lMax: .3, sp: Math.PI });
+
+  if (bmPr > .08) {
+    emit(tx, by, 3, { col: bmCol2, sMin: 16, sMax: 70, szMin: 2, szMax: 5, lMin: .1, lMax: .25, sp: Math.PI * .7 });
+    emit(tx, by, 2, { col: bmCol, tp: 'ring', szMin: 3, szMax: 6, lMin: .08, lMax: .18, sp: Math.PI * .5 });
+  }
 }
